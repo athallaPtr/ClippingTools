@@ -7,6 +7,9 @@ kirim ulang notebook ke buyer.
 
 import subprocess
 import os
+import shutil
+
+VIDEO_EXTENSIONS = (".mp4", ".mov", ".mkv", ".webm")
 
 
 def download_video(url, out_path, cookies_path="/content/cookies.txt"):
@@ -43,3 +46,35 @@ def download_video(url, out_path, cookies_path="/content/cookies.txt"):
         print(f"Gagal dengan client '{client}': {err_lines[-1] if err_lines else result.stderr[-300:]}")
 
     return False
+
+
+def get_source_video(video_link, source_path, drive_input_dir="/content/drive/MyDrive/AutoClipper_Input"):
+    """
+    Coba download otomatis dulu. Kalau gagal (video di-flag ketat oleh YouTube),
+    cek apakah user sudah upload video manual ke folder Drive sebagai fallback.
+
+    Return (True, "auto") kalau berhasil download otomatis,
+           (True, "manual") kalau berhasil ambil dari upload manual Drive,
+           (False, None) kalau dua-duanya belum berhasil.
+    """
+    ok = download_video(video_link, source_path)
+    if ok:
+        return True, "auto"
+
+    print("\nDownload otomatis gagal. Mengecek folder upload manual di Drive...")
+    os.makedirs(drive_input_dir, exist_ok=True)
+
+    found = None
+    for fname in sorted(os.listdir(drive_input_dir)):
+        if fname.lower().endswith(VIDEO_EXTENSIONS):
+            found = os.path.join(drive_input_dir, fname)
+            break
+
+    if found:
+        print(f"Video ditemukan di Drive: {found}")
+        print("Menyalin ke folder kerja...")
+        shutil.copy(found, source_path)
+        return True, "manual"
+
+    print(f"Belum ada video di folder Drive: {drive_input_dir}")
+    return False, None
