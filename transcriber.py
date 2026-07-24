@@ -61,6 +61,33 @@ def find_natural_end(words, target_end, max_extra=10, min_shrink=3):
     return target_end
 
 
+def find_natural_start(words, target_start, max_extra=4):
+    """
+    Cari titik awal kalimat paling natural SEBELUM target_start, supaya klip
+    tidak mulai di tengah kalimat (dan ada 'napas' sebelum kata pertama
+    diucapkan -- penting karena bagian ini ketutup hook judul + fade in).
+    Cari kata yang merupakan AWAL kalimat (kata pertama, atau kata setelah
+    tanda baca akhir kalimat sebelumnya) paling dekat sebelum target_start,
+    dalam batas mundur max_extra detik. Kalau tidak ketemu, mundur tetap
+    sejauh max_extra (asal tidak sampai negatif).
+    """
+    lower_bound = max(0, target_start - max_extra)
+    if not words:
+        return lower_bound
+
+    candidates = []
+    for i, w in enumerate(words):
+        if lower_bound <= w["start"] <= target_start:
+            is_sentence_start = (i == 0) or words[i - 1]["text"].endswith(SENTENCE_ENDERS)
+            if is_sentence_start:
+                candidates.append(w["start"])
+
+    if candidates:
+        return max(candidates)  # ambil yang PALING DEKAT ke target_start (bukan yang paling awal)
+
+    return lower_bound
+
+
 def sec_to_ass_time(sec):
     sec = max(0, sec)
     h = int(sec // 3600)
