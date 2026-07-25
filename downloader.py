@@ -17,6 +17,8 @@ def download_video(url, out_path, cookies_path="/content/cookies.txt"):
     Coba download video dari beberapa 'client' yt-dlp secara berurutan.
     Return True kalau salah satu berhasil, False kalau semua gagal.
     """
+    subprocess.run(["pip", "install", "-q", "-U", "yt-dlp"], capture_output=True)
+    print("yt-dlp sudah dipastikan versi terbaru.")                
     base_cmd = [
         "yt-dlp",
         "-f", "bv*+ba/b",   # selector fleksibel: video+audio terbaik, fallback ke gabungan terbaik
