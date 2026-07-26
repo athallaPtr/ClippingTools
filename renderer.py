@@ -11,7 +11,7 @@ Memanggil fungsi dari face_tracker.py dan transcriber.py.
 
 import subprocess
 
-from face_tracker import build_crop_filter
+from face_tracker import build_crop_filter, build_manual_crop_filter
 from transcriber import (
     transcribe_words,
     find_natural_start,
@@ -56,6 +56,20 @@ def compute_title_fontsize(line1, line2):
     usable_width = CANVAS_WIDTH - (2 * TITLE_MARGIN_PX)
     est_fontsize = int(usable_width / (longest_chars * 0.62))
     return max(TITLE_MIN_FONTSIZE, min(TITLE_MAX_FONTSIZE, est_fontsize))
+
+
+def get_crop_filter(source_path, start, end, mode, crop_override):
+    """
+    Pilih antara crop MANUAL (kalau user set lewat crop editor di website)
+    atau crop OTOMATIS (deteksi wajah via face_tracker, seperti biasa).
+    crop_override: None (pakai otomatis), atau dict
+        {"orientation": "vertical", "x": 0.0-1.0} / {"orientation": "horizontal"}
+    """
+    if crop_override:
+        orientation = crop_override.get("orientation", "vertical")
+        center_x_ratio = crop_override.get("x", 0.5)
+        return build_manual_crop_filter(source_path, orientation, center_x_ratio)
+    return build_crop_filter(source_path, start, end, mode)
 
 
 def _extract_frame(source_path, timestamp, out_png):
@@ -119,6 +133,7 @@ def _build_bumper(frame_png, crop_filter, duration, dim_fade_type, dim_fade_star
 def process_clip(index, clip, source_path, output_dir, mode, whisper_model, total_clips):
     target_start = clip["start"]
     target_end = clip["end"]
+    crop_override = clip.get("crop_override")
     label = clip.get("label", f"clip_{index}")
     safe_label = "".join(c if c.isalnum() or c in " -_" else "" for c in label).strip().replace(" ", "_")
     base_name = f"{index:02d}_{safe_label}"
@@ -165,7 +180,7 @@ def process_clip(index, clip, source_path, output_dir, mode, whisper_model, tota
     build_ass_subtitle(clip_words, content_duration, ass_path)
 
     # 3) Render main.mp4: crop + burn subtitle
-    main_crop_filter = build_crop_filter(source_path, content_start_abs, content_end_abs, mode)
+    main_crop_filter = get_crop_filter(source_path, content_start_abs, content_end_abs, mode, crop_override)
     subprocess.run([
         "ffmpeg", "-y", "-ss", str(content_start_abs), "-i", source_path, "-t", str(content_duration),
         "-vf", f"{main_crop_filter},ass={ass_path}",
@@ -178,8 +193,8 @@ def process_clip(index, clip, source_path, output_dir, mode, whisper_model, tota
     _extract_frame(source_path, content_start_abs, intro_frame_png)
     _extract_frame(source_path, max(content_start_abs, content_end_abs - 0.1), outro_frame_png)
 
-    intro_crop_filter = build_crop_filter(source_path, content_start_abs, content_start_abs + 0.5, mode)
-    outro_crop_filter = build_crop_filter(source_path, max(content_start_abs, content_end_abs - 0.5), content_end_abs, mode)
+    intro_crop_filter = get_crop_filter(source_path, content_start_abs, content_start_abs + 0.5, mode, crop_override)
+    outro_crop_filter = get_crop_filter(source_path, max(content_start_abs, content_end_abs - 0.5), content_end_abs, mode, crop_override)
 
     # 5) Render intro.mp4: freeze depan, dim HOLD 2 detik lalu transisi 1 detik ke normal, + judul 2 baris
     line1, line2 = wrap_label_two_lines(label.upper())
