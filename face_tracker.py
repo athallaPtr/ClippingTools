@@ -97,3 +97,32 @@ def build_crop_filter(video_path, start, end, mode):
     center_x = int(center_x_ratio * src_w)
     x_offset = max(0, min(src_w - target_w, center_x - target_w // 2))
     return f"crop={target_w}:{src_h}:{x_offset}:0,scale=1080:1920"
+
+
+def build_manual_crop_filter(video_path, orientation, center_x_ratio=0.5):
+    """
+    Crop berdasarkan pilihan MANUAL dari user (lewat crop editor di website),
+    bukan deteksi wajah otomatis.
+
+    orientation="vertical"  -> crop 9:16 ketat, posisi horizontal sesuai
+                                center_x_ratio (0.0 = paling kiri, 1.0 = paling
+                                kanan) yang digeser user sendiri.
+    orientation="horizontal" -> tidak ada crop sama sekali (biar 2 orang yang
+                                 nggak muat di crop sempit tetap kelihatan
+                                 utuh), full lebar video di-scale ke lebar
+                                 kanvas 1080px, sisa ruang atas-bawah diisi
+                                 warna hitam (letterbox) biar tetap pas di
+                                 kanvas 1080x1920.
+    """
+    if orientation == "horizontal":
+        return "scale=1080:-2,pad=1080:1920:0:(1920-ih)/2:color=black"
+
+    cap = cv2.VideoCapture(video_path)
+    src_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    src_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    cap.release()
+
+    target_w = int(src_h * 9 / 16)
+    center_x = int(center_x_ratio * src_w)
+    x_offset = max(0, min(src_w - target_w, center_x - target_w // 2))
+    return f"crop={target_w}:{src_h}:{x_offset}:0,scale=1080:1920"
